@@ -63,18 +63,17 @@ module.exports = (robot) ->
 
   robot.respond /TASKLIST$/i, (msg) ->
     if msg.message.room is config.announce_channel
-      redmine_groups = msg.http("#{config.redmine_url}/groups.json?key=#{config.api_key}").get() (err, res, body) ->
-        parse_body = JSON.parse body
+      msg.http("#{config.redmine_url}/groups.json?key=#{config.api_key}").get() (err, res, body) ->
+        redmine_groups = JSON.parse body
 
-        for group in parse_body.groups
+        for group in redmine_groups.groups
           if group.name is config.admin_group
-            g_id = group.id
-            msg.http("#{config.redmine_url}/groups/#{g_id}.json?include=users&key=#{config.api_key}").get() (err, res, body) ->
-              groups_parse_body = JSON.parse body
-              if groups_parse_body.group.users.length > 0
+            msg.http("#{config.redmine_url}/groups/#{group.id}.json?include=users&key=#{config.api_key}").get() (err, res, body) ->
+              group_users = JSON.parse body
+              if group_users.group.users.length > 0
                 msg.http("#{config.redmine_url}/issues.json?status_id=*&key=#{config.api_key}").get() (err, res, body) ->
                   tasks = {}
-                  for user in groups_parse_body.group.users
+                  for user in group_users.group.users
                     tasks[user.name] = {
                                         "active": 0
                                         "expired": 0
@@ -83,14 +82,14 @@ module.exports = (robot) ->
                   issues = JSON.parse body
                   for issue in issues.issues
                     user = assigned_user issue
-                    if user.name of tasks == true
-                      if issue.status.name is "終了" or issue.status.name is "closed"
+                    if user.name of tasks is true
+                      if issue.status.name is "終了" or issue.status.name is "却下"
                         tasks[user.name]['closed']++
                       else
                         tasks[user.name]['active']++
                         tasks[user.name]['expired']++ if is_expired(issue.due_date)
-                  issue_url = "#{config.redmine_url}/issues?set_filter=1&sort=priority:desc,due_date:asc,updated_on:desc&assigned_to_id="
+                  issue_url = "#{config.redmine_url}/issues?set_filter=1&sort=priority:desc,due_date:asc,updated_on:desc&f[]=status_id&f[]=assigned_to_id&op[assigned_to_id]==&v[assigned_to_id][]="
                   tasklist = "|ユーザ名|未完了タスク|期限切れタスク|完了済みタスク|\n"
                   tasklist += "|:---|:---:|:---:|:---:|\n"
-                  tasklist += ("|#{user.name}|[#{tasks[user.name]['active']}](#{issue_url}#{user.id}&status_id=open)|[#{tasks[user.name]['expired']}](#{issue_url}#{user.id}&status_id=open&op[due_date]=<t-&v[due_date])|[#{tasks[user.name]['closed']}](#{issue_url}#{user.id}&status_id=closed)|\n" for user in groups_parse_body.group.users).sort().join('')
+                  tasklist += ("|#{user.name}|[#{tasks[user.name]['active']}](#{issue_url}#{user.id}&op[status_id]=o)|[#{tasks[user.name]['expired']}](#{issue_url}#{user.id}&&op[status_id]=o&f[]=due_date&op[due_date]=<t-&v[due_date][]=1)|[#{tasks[user.name]['closed']}](#{issue_url}#{user.id}&op[status_id]=c)|\n" for user in group_users.group.users).sort().join('')
                   msg.send(tasklist)
