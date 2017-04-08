@@ -35,13 +35,13 @@ module.exports = (robot) ->
     return
 
   robot.respond /DAILY$/i, (msg) ->
-    if msg.message.room == config.announce_channel
+    if msg.message.room is config.announce_channel
       msg.http("#{config.daily_url}?key=#{config.api_key}").get() (err, res, body) ->
         parse_body = JSON.parse body
         msg.send(parse_body.wiki_page.text);
 
   robot.respond /WEEKLY$/i, (msg) ->
-    if msg.message.room == config.announce_channel
+    if msg.message.room is config.announce_channel
       msg.http("#{config.weekly_url}?key=#{config.api_key}").get() (err, res, body) ->
         parse_body = JSON.parse body
         msg.send(parse_body.wiki_page.text);
