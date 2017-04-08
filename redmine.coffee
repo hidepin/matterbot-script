@@ -89,7 +89,8 @@ module.exports = (robot) ->
                       else
                         tasks[user.name]['active']++
                         tasks[user.name]['expired']++ if is_expired(issue.due_date)
+                  issue_url = "#{config.redmine_url}/issues?set_filter=1&sort=priority:desc,due_date:asc,updated_on:desc&assigned_to_id="
                   tasklist = "|ユーザ名|未完了タスク|期限切れタスク|完了済みタスク|\n"
-                  tasklist += "|---|---|---|---|\n"
-                  tasklist += ("|#{user.name}|#{tasks[user.name]['active']}|#{tasks[user.name]['expired']}|#{tasks[user.name]['closed']}|\n" for user in groups_parse_body.group.users).sort().join('')
+                  tasklist += "|:---|:---:|:---:|:---:|\n"
+                  tasklist += ("|#{user.name}|[#{tasks[user.name]['active']}](#{issue_url}#{user.id}&status_id=open)|[#{tasks[user.name]['expired']}](#{issue_url}#{user.id}&status_id=open&op[due_date]=<t-&v[due_date])|[#{tasks[user.name]['closed']}](#{issue_url}#{user.id}&status_id=closed)|\n" for user in groups_parse_body.group.users).sort().join('')
                   msg.send(tasklist)
