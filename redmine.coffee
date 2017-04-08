@@ -36,6 +36,12 @@ is_expired = (date) ->
   today = new Date()
   today > expired_date
 
+get_status = (expired) ->
+  if expired > 0
+    ":cold_sweat:"
+  else
+    ":smile:"
+
 module.exports = (robot) ->
   robot.hear /HEY/i, (msg) ->
     msg.send('hey')
@@ -89,7 +95,7 @@ module.exports = (robot) ->
                         tasks[user.name]['active']++
                         tasks[user.name]['expired']++ if is_expired(issue.due_date)
                   issue_url = "#{config.redmine_url}/issues?set_filter=1&sort=priority:desc,due_date:asc,updated_on:desc&f[]=status_id&f[]=assigned_to_id&op[assigned_to_id]==&v[assigned_to_id][]="
-                  tasklist = "|ユーザ名|未完了タスク|期限切れタスク|完了済みタスク|\n"
-                  tasklist += "|:---|:---:|:---:|:---:|\n"
-                  tasklist += ("|#{user.name}|[#{tasks[user.name]['active']}](#{issue_url}#{user.id}&op[status_id]=o)|[#{tasks[user.name]['expired']}](#{issue_url}#{user.id}&&op[status_id]=o&f[]=due_date&op[due_date]=<t-&v[due_date][]=1)|[#{tasks[user.name]['closed']}](#{issue_url}#{user.id}&op[status_id]=c)|\n" for user in group_users.group.users).sort().join('')
+                  tasklist = "|ユーザ名|ステータス|未完了タスク|期限切れタスク|完了済みタスク|\n"
+                  tasklist += "|:---|:---:|:---:|:---:|:---:|\n"
+                  tasklist += ("|#{user.name}|#{get_status(tasks[user.name]['expired'])}|[#{tasks[user.name]['active']}](#{issue_url}#{user.id}&op[status_id]=o)|[#{tasks[user.name]['expired']}](#{issue_url}#{user.id}&&op[status_id]=o&f[]=due_date&op[due_date]=<t-&v[due_date][]=1)|[#{tasks[user.name]['closed']}](#{issue_url}#{user.id}&op[status_id]=c)|\n" for user in group_users.group.users).sort().join('')
                   msg.send(tasklist)
