@@ -12,6 +12,7 @@
 # Commands:
 #   hubot daily - view daily agenda
 #   hubot weekly - view weekly agenda
+#   hubot tasklist - view task list
 #
 # Author:
 #   hidepin <hidepin@gmail.com>
@@ -43,9 +44,6 @@ get_status = (expired) ->
     ":smile:"
 
 module.exports = (robot) ->
-  robot.hear /HEY/i, (msg) ->
-    msg.send('hey')
-
   unless config.api_key? and
          config.admin_group? and
          config.announce_channel? and
