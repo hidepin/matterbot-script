@@ -24,6 +24,7 @@ config =
   redmine_url: process.env.HUBOT_REDMINE_REDMINE_URL
   daily_url: process.env.HUBOT_REDMINE_DAILY_URL
   weekly_url: process.env.HUBOT_REDMINE_WEEKLY_URL
+  issue_list_limit: process.env.HUBOT_REDMINE_ISSUE_LIST_LIMIT
 
 assigned_user = (issue) ->
   if issue.assigned_to?
@@ -75,7 +76,7 @@ module.exports = (robot) ->
             msg.http("#{config.redmine_url}/groups/#{group.id}.json?include=users&key=#{config.api_key}").get() (err, res, body) ->
               group_users = JSON.parse body
               if group_users.group.users.length > 0
-                msg.http("#{config.redmine_url}/issues.json?status_id=*&key=#{config.api_key}").get() (err, res, body) ->
+                msg.http("#{config.redmine_url}/issues.json?status_id=*&limit=#{config.issue_list_limit}&key=#{config.api_key}").get() (err, res, body) ->
                   tasks = {}
                   for user in group_users.group.users
                     tasks[user.name] = {
