@@ -63,7 +63,7 @@ assigned_user = (issue) ->
 
 is_expired = (date) ->
   return false unless date?
-  expired_date = new Date(date)
+  expired_date = new Date(date + " 23:59:59")
   today = new Date()
   today > expired_date
 
