@@ -24,7 +24,36 @@ config =
   redmine_url: process.env.HUBOT_REDMINE_REDMINE_URL
   daily_url: process.env.HUBOT_REDMINE_DAILY_URL
   weekly_url: process.env.HUBOT_REDMINE_WEEKLY_URL
-  issue_list_limit: process.env.HUBOT_REDMINE_ISSUE_LIST_LIMIT
+  issue_list_limit: 100
+
+class Tasks
+  constructor: ->
+    @msg
+    @tasks = {}
+
+  set_msg: (msg) ->
+    @msg = msg
+
+  set_user: (uname) ->
+    @tasks[uname] = new Task
+
+  get_user: (uname) ->
+    @tasks[uname]
+
+class Task
+  constructor: ->
+    @active = 0
+    @expired = 0
+    @closed = 0
+
+  countup_active: ->
+    @active++
+
+  countup_expired: ->
+    @expired++
+
+  countup_closed: ->
+    @closed++
 
 assigned_user = (issue) ->
   if issue.assigned_to?
@@ -43,6 +72,33 @@ get_status = (expired) ->
     ":cold_sweat:"
   else
     ":smile:"
+
+tasklist_header = ->
+  tasklist_h = "|ユーザ名|ステータス|未完了タスク|期限切れタスク|完了済みタスク|\n"
+  tasklist_h += "|:---|:---:|:---:|:---:|:---:|\n"
+  tasklist_h
+
+send_tasklist = (tasks,users) ->
+  issue_url = "#{config.redmine_url}/issues?set_filter=1&sort=priority:desc,due_date:asc,updated_on:desc&f[]=status_id&f[]=assigned_to_id&op[assigned_to_id]==&v[assigned_to_id][]="
+  tasklist = tasklist_header()
+  tasklist += ("|#{user.name}|#{get_status(tasks.get_user(user.name).expired)}|[#{tasks.get_user(user.name).active}](#{issue_url}#{user.id}&op[status_id]=o)|[#{tasks.get_user(user.name).expired}](#{issue_url}#{user.id}&&op[status_id]=o&f[]=due_date&op[due_date]=<t-&v[due_date][]=1)|[#{tasks.get_user(user.name).closed}](#{issue_url}#{user.id}&op[status_id]=c)|\n" for user in users).sort().join('')
+  tasks.msg.send(tasklist)
+
+view_tasklist = (tasks, pages, users) ->
+  if pages is 0
+    send_tasklist(tasks, users)
+  else
+    tasks.msg.http("#{config.redmine_url}/issues.json?status_id=*&limit=100&page=#{pages}&key=#{config.api_key}").get() (err, res, body) ->
+      issues = JSON.parse body
+      for issue in issues.issues
+        user = assigned_user issue
+        if tasks.get_user(user.name)?
+          if issue.status.name is "終了" or issue.status.name is "却下"
+            tasks.get_user(user.name).countup_closed()
+          else
+            tasks.get_user(user.name).countup_active()
+            tasks.get_user(user.name).countup_expired() if is_expired(issue.due_date)
+      view_tasklist(tasks, pages - 1, users)
 
 module.exports = (robot) ->
   unless config.api_key? and
@@ -76,25 +132,12 @@ module.exports = (robot) ->
             msg.http("#{config.redmine_url}/groups/#{group.id}.json?include=users&key=#{config.api_key}").get() (err, res, body) ->
               group_users = JSON.parse body
               if group_users.group.users.length > 0
-                msg.http("#{config.redmine_url}/issues.json?status_id=*&limit=#{config.issue_list_limit}&key=#{config.api_key}").get() (err, res, body) ->
-                  tasks = {}
+                msg.http("#{config.redmine_url}/issues.json?status_id=*&key=#{config.api_key}").get() (err, res, body) ->
+                  tasks = new Tasks
+                  tasks.set_msg(msg)
                   for user in group_users.group.users
-                    tasks[user.name] = {
-                                        "active": 0
-                                        "expired": 0
-                                        "closed": 0
-                                       }
-                  issues = JSON.parse body
-                  for issue in issues.issues
-                    user = assigned_user issue
-                    if user.name of tasks is true
-                      if issue.status.name is "終了" or issue.status.name is "却下"
-                        tasks[user.name]['closed']++
-                      else
-                        tasks[user.name]['active']++
-                        tasks[user.name]['expired']++ if is_expired(issue.due_date)
-                  issue_url = "#{config.redmine_url}/issues?set_filter=1&sort=priority:desc,due_date:asc,updated_on:desc&f[]=status_id&f[]=assigned_to_id&op[assigned_to_id]==&v[assigned_to_id][]="
-                  tasklist = "|ユーザ名|ステータス|未完了タスク|期限切れタスク|完了済みタスク|\n"
-                  tasklist += "|:---|:---:|:---:|:---:|:---:|\n"
-                  tasklist += ("|#{user.name}|#{get_status(tasks[user.name]['expired'])}|[#{tasks[user.name]['active']}](#{issue_url}#{user.id}&op[status_id]=o)|[#{tasks[user.name]['expired']}](#{issue_url}#{user.id}&&op[status_id]=o&f[]=due_date&op[due_date]=<t-&v[due_date][]=1)|[#{tasks[user.name]['closed']}](#{issue_url}#{user.id}&op[status_id]=c)|\n" for user in group_users.group.users).sort().join('')
-                  msg.send(tasklist)
+                    tasks.set_user(user.name)
+
+                  total_count = JSON.parse(body).total_count
+
+                  view_tasklist(tasks, Math.ceil(total_count / 100), group_users.group.users)
