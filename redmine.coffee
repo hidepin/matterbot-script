@@ -132,7 +132,7 @@ module.exports = (robot) ->
             msg.http("#{config.redmine_url}/groups/#{group.id}.json?include=users&key=#{config.api_key}").get() (err, res, body) ->
               group_users = JSON.parse body
               if group_users.group.users.length > 0
-                msg.http("#{config.redmine_url}/issues.json?status_id=*&key=#{config.api_key}").get() (err, res, body) ->
+                msg.http("#{config.redmine_url}/issues.json?status_id=*&limit=#{config.issue_list_limit}&key=#{config.api_key}").get() (err, res, body) ->
                   tasks = new Tasks
                   tasks.set_msg(msg)
                   for user in group_users.group.users
